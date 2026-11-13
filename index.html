@@ -46,7 +46,7 @@ footer{color:var(--mute);font-size:12px;text-align:center;line-height:1.5}
    demo:false → echte Abfrage der Wiener-Linien-Schnittstelle (in der Android-App) */
 const CONFIG = {
   demo: false,
-  proxyUrl: "", // nur nötig, falls der Browser die Direktabfrage blockiert
+  proxyUrl: "https://corsproxy.io/?https://www.wienerlinien.at/ogd_realtime/monitor",
   baseUrl: "https://www.wienerlinien.at/ogd_realtime/monitor",
   refreshMs: 20000,
   boards: [
@@ -64,22 +64,67 @@ const CONFIG = {
 const state = CONFIG.boards.map(() => ({ deps: [], err: null }));
 const $ = s => document.querySelector(s);
 
-/* Echtabfrage: Schnittstelle liefert pro Abfahrt countdown (Minuten) – daraus Zielzeit */
 async function fetchLive(b) {
-  const q = b.stopIds.map(id => "stopId=" + id).join("&");
-  const r = await fetch((CONFIG.proxyUrl || CONFIG.baseUrl) + "?" + q);
-  const j = await r.json();
-  if (j.message && j.message.messageCode !== 1) throw new Error(j.message.value);
-  const now = Date.now(), out = [];
-  for (const m of j.data.monitors || [])
-    for (const l of m.lines || []) {
-      if (!b.lines.includes(l.name)) continue;
-      if (b.towards && !b.towards.test(l.towards)) continue;
-      for (const d of l.departures.departure || [])
-        out.push({ line: l.name, towards: (d.vehicle && d.vehicle.towards) || l.towards,
-                   t: now + d.departureTime.countdown * 60000 });
-    }
-  return out.sort((a, c) => a.t - c.t).slice(0, 6);
+
+  const q = b.stopIds
+      .map(id => "stopId=" + encodeURIComponent(id))
+      .join("&");
+
+  const url =
+      (CONFIG.proxyUrl || CONFIG.baseUrl)
+      + "?"
+      + q;
+
+  const response = await fetch(url, {
+      method: "GET",
+      headers: {
+          "Accept": "application/json"
+      }
+  });
+
+  if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+  }
+
+  const j = await response.json();
+
+  if (j.message && j.message.messageCode !== 1) {
+      throw new Error(j.message.value || "API-Fehler");
+  }
+
+  const now = Date.now();
+  const out = [];
+
+  for (const monitor of (j.data?.monitors || [])) {
+
+      for (const line of (monitor.lines || [])) {
+
+          if (!b.lines.includes(line.name))
+              continue;
+
+          if (b.towards && !b.towards.test(line.towards))
+              continue;
+
+          for (const dep of (line.departures?.departure || [])) {
+
+              const countdown =
+                  dep.departureTime?.countdown;
+
+              if (countdown == null)
+                  continue;
+
+              out.push({
+                  line: line.name,
+                  towards: dep.vehicle?.towards || line.towards,
+                  t: now + countdown * 60000
+              });
+          }
+      }
+  }
+
+  return out
+      .sort((a, b) => a.t - b.t)
+      .slice(0, 6);
 }
 
 /* Demo: laufende Abfahrten, die sich nach und nach erneuern */

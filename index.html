@@ -50,15 +50,42 @@ const CONFIG = {
   baseUrl: "https://www.wienerlinien.at/ogd_realtime/monitor",
   refreshMs: 20000,
   boards: [
-    { title: "Innstraße", sub: "Straßenbahn · stadteinwärts", type: "tram",
-      stopIds: [316, 325] /* beide Richtungen; nach dem Test auf die richtige kürzen */,
-      lines: ["2", "12"], towards: null,
-      demo: [["2", "Stadteinwärts", 4], ["12", "Stadteinwärts", 7]] },
-    { title: "Therese-Ammon-Park", sub: "Bus 11A · Richtung Vorgartenstraße", type: "bus",
-      stopIds: [594, 621] /* beide Richtungen; nach dem Test auf die richtige kürzen */,
-      lines: ["11A"], towards: null,
-      demo: [["11A", "Vorgartenstraße", 3]] }
-  ]
+  {
+    title: "Innstraße",
+    sub: "Straßenbahn · stadteinwärts",
+    type: "tram",
+    stopIds: [316, 325],
+
+    lines: ["2", "12"],
+
+    directions: {
+      "2": /Dornbach/i,
+      "12": /Hillerstraße/i
+    },
+
+    demo: [
+      ["2", "Dornbach", 4],
+      ["12", "Hillerstraße", 7]
+    ]
+  },
+
+  {
+    title: "Therese-Ammon-Park",
+    sub: "Bus 11A",
+    type: "bus",
+    stopIds: [594, 621],
+
+    lines: ["11A"],
+
+    directions: {
+      "11A": /Stadion U|Elderschplatz/i
+    },
+
+    demo: [
+      ["11A", "Stadion U", 3]
+    ]
+  }
+]
 };
 
 const state = CONFIG.boards.map(() => ({ deps: [], err: null }));
@@ -100,10 +127,16 @@ async function fetchLive(b) {
       for (const line of (monitor.lines || [])) {
 
           if (!b.lines.includes(line.name))
-              continue;
+    continue;
 
-          if (b.towards && !b.towards.test(line.towards))
-              continue;
+if (b.directions && b.directions[line.name]) {
+
+    const target =
+        (line.towards || "");
+
+    if (!b.directions[line.name].test(target))
+        continue;
+}
 
           for (const dep of (line.departures?.departure || [])) {
 

@@ -180,7 +180,17 @@ async function refresh() {
     try {
       state[i].deps = CONFIG.demo ? fetchDemo(CONFIG.boards[i], state[i].deps) : await fetchLive(CONFIG.boards[i]);
       state[i].err = null;
-    } catch (e) { state[i].err = "Keine Verbindung (" + (e.message || e) + ")"; }
+    } 
+    
+    catch (e) {
+
+    console.error(e);
+
+    if (state[i].deps.length === 0) {
+        state[i].err =
+            "Keine Verbindung";
+    }
+}
   }
   $("#foot").innerHTML = CONFIG.demo
     ? "Demodaten – simulierte Abfahrten.<br>Die echte Abfrage ist vorbereitet (demo: false)."
